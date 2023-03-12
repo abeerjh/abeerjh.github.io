@@ -1,0 +1,100 @@
+ /* First, all data from 12 months will be merged in one table then we will start the cleaning process.
+    
+    -- New table will be called all_year_data.
+    -- We will merge the tables using the UNION ALL function since we 
+       want all rows even if there are duplicates. */
+
+create table eminent-scanner-374403.bicycle.all_year_data as
+select *
+from (
+
+ select * 
+ from `eminent-scanner-374403.bicycle.jan22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.feb22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.mar22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.apr22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.may22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.jun22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.jul22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.aug22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.sep22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.oct22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.nov22`
+ union all
+ select *
+ from `eminent-scanner-374403.bicycle.dec22`
+); 
+
+
+        /* Note: When running the query there was a total of 5,667,717 rows. 
+        When adding the rows from all 12 individual months it gave back the same total. */ 
+
+  /*---Before we clean the data, first we need to check if all ride_id are unique since it will be our primary key variable. */
+
+
+
+ select count (distinct ride_id)
+from `eminent-scanner-374403.bicycle.all_year_data`;
+
+  
+        /* Note: It retured the same number of total rides which is 5,667,717 rides. 
+        Therefore, all the ride_id are unique and distinct and no cleaning is needed. */
+
+  /* ---Types of rides will be check to make check how many unique rideable_type are there. */
+  
+  select distinct rideable_type, count(rideable_type)
+  from `eminent-scanner-374403.bicycle.all_year_data`
+  group by rideable_type
+  
+        /* Note: gave back 3 distinct ride types: 2889029 electric_bike, 2601214 classic_bike,
+         and 177474 docked_bike.*/ 
+
+  /* ---Time length of the trip will be calculated as we biased trips such as trips longer than a day and shorter than 1 min.*/
+
+select *
+from `eminent-scanner-374403.bicycle.all_year_data`
+where timestamp_diff(ended_at, started_at,minute) >= 1 and
+      timestamp_diff(ended_at, started_at, minute)<= 1440;
+  
+        /* Note: There were 5,541,269 rides with an acceptable ride time length.*/
+
+  /* ----Since several station names don't exist we will just use latitude and longitude for start and end to detect location. Therefore, we will check to make sure there are no null values for the start and end latitude and longitude. */
+
+
+  select *
+  from `eminent-scanner-374403.bicycle.all_year_data`
+  where start_lat is null or start_lng is null or
+        end_lat is null or end_lng is null; 
+        
+
+        /* Note: There were 5,858 rides with null or start_lng or start_lat or end_lat or end_lng.
+         These will be removed during analysis as we need all analysed rides so have an ending locatin. */
+
+  /* ---Check if there are 2 only member types: casual and member.*/
+
+  select distinct member_casual, count (member_casual), 
+  from `eminent-scanner-374403.bicycle.all_year_data`
+  group by member_casual
+
+        /* Note: There were only 2 member types: casual and member. 3345685 annual members
+         and 2322032 casual  members. Therefore, no need for further cleaning in that area is needed. */
