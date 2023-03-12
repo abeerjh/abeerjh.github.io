@@ -1,0 +1,164 @@
+ with new_table as
+  (select * 
+from `eminent-scanner-374403.bicycle.all_year_data`),
+ 
+
+
+ adjusted_table as ( 
+   select *,
+
+   /* Change docked_bikes to classic_bikes) by using replace clause.*/
+   replace (rideable_type,'docked_bike','classic_bike')as fixed_ride_type,  
+
+  /* Extract day of the week from start_at. */  
+  
+  ( case
+   when extract(dayofweek from date(started_at)) = 1 then 'Sunday'
+   when extract(dayofweek from date(started_at)) = 2 then 'Monday'
+   when extract(dayofweek from date(started_at)) = 3 then 'Tuesday'
+   when extract(dayofweek from date(started_at)) = 4 then 'Wednesday'
+   when extract(dayofweek from date(started_at)) = 5 then 'Thursday'
+   when extract(dayofweek from date(started_at)) = 6 then 'Friday'
+   else 'Saturday'
+   end ) as start_day,
+
+   /*Extract month from started_at date.*/
+   (case
+   when extract (month from date(started_at)) =1 then 'January'
+   when extract (month from date(started_at)) =2 then 'February'
+   when extract (month from date(started_at)) =3 then 'March'
+   when extract (month from date(started_at)) =4 then 'April'
+   when extract (month from date(started_at)) =5 then 'May'
+   when extract (month from date(started_at)) =6 then 'June'
+   when extract (month from date(started_at)) =7 then 'July'
+   when extract (month from date(started_at)) =8 then 'August'
+   when extract (month from date(started_at)) =9 then 'September'
+   when extract (month from date(started_at)) =10 then 'October'
+   when extract (month from date(started_at)) =11 then 'November'
+   else 'December'
+   end) as start_month,
+
+   /*Extract day# of the month from started_at date. */
+   extract(day from date(started_at)) as day_of_month, 
+
+   /*Extract year from started_at date.*/
+   extract(year from date (started_at)) as year,
+
+  /* Extract the hour time when trip started.*/
+   extract (hour from time(started_at)) as start_time,
+
+   /*Extract the hour time when trip ended.*/
+   extract (hour from time (ended_at)) as end_time,
+
+   /*Calculating =trip travel time.*/
+   timestamp_diff(ended_at, started_at,minute) as trip_time
+
+   from new_table
+ ),
+
+
+/* Clean data further by deleting rows that don't have a reasonable travel time and that don't have longitude or latitude start or end location. */
+
+cleaned_table as ( select *
+from adjusted_table
+where trip_time >=1 and trip_time <=1440 and
+start_lat is not null and start_lng is not null and end_lat is not null and end_lng is not null),
+
+/* ____________________Start data Analysis___________________*/
+
+/* Find ride trips per month for each membership type */
+
+rides_per_month as(
+select member_casual, start_month, count (*) as num_of_rides_month
+from cleaned_table
+group by member_casual,start_month),
+
+/*Find ride trips for every weekday for each membership type. */
+rides_per_weekday as (
+  select member_casual, start_day, count(*) as num_of_rides_day
+  from cleaned_table
+  group by member_casual, start_day),
+
+/* Find ride trips for each hour of the day for each membership time. */
+  rides_per_hour as (
+        select member_casual,
+        
+        (case 
+          when start_time = 0 then '12 AM'
+          when start_time = 1 then '1 AM'
+          when start_time = 2 then '2 AM'
+          when start_time = 3 then '3 AM'
+          when start_time = 4 then '4 AM'
+          when start_time = 5 then '5 AM'
+          when start_time = 6 then '6 AM'
+          when start_time = 7 then '7 AM'
+          when start_time = 8 then '8 AM'
+          when start_time = 9 then '9 AM'
+          when start_time = 10 then '10 AM'
+          when start_time = 11 then '11 AM'
+          when start_time = 12 then '12 PM'
+          when start_time = 13 then '1 PM'
+          when start_time = 14 then '2 PM'
+          when start_time = 15 then '3 PM'
+          when start_time = 16 then '4 PM'
+          when start_time = 17 then '5 PM'
+          when start_time = 18 then '6 PM'
+          when start_time = 19 then '7 PM'
+          when start_time = 20 then '8 PM'
+          when start_time = 21 then '9 PM'
+          when start_time = 22 then '10 PM'
+          else '11 PM'
+          end ) as ride_time ,
+          
+          count (*) as num_rides_time
+    from cleaned_table
+    group by member_casual, ride_time
+    order by member_casual,ride_time
+     
+  ),
+
+  /* Find type of ride for each membership type.*/
+
+  type_of_ride as ( 
+    select fixed_ride_type, member_casual, count(*) as num_trips
+  from cleaned_table
+  group by fixed_ride_type, member_casual 
+  ),
+
+  /* Find average length of ride per day. */
+  avg_ridelength_per_day as (
+    select  start_day, member_casual, round (avg(trip_time),2) as avg_ride_time_minutes
+    from cleaned_table
+    group by  start_day, member_casual
+  ),
+/* Find average length of ride per membership type. */
+
+avg_ridelength_per_member as (
+  select  member_casual, round(avg(trip_time),2)as avg_ride_time
+  from cleaned_table
+  group by member_casual)
+,
+  /* Find maximum length of ride per day. */
+
+  max_ridelength_per_day as (
+    select start_day, member_casual, max(trip_time) as max_ride_time
+    from cleaned_table
+    group by start_day, member_casual
+  ),
+
+
+max_ridelength_per_member as (
+  select member_casual,max(trip_time) as max_ride
+  from cleaned_table
+  group by member_casual
+),
+
+ 
+ 
+/* Determine the number of bike trips per membership type and bike type. */
+  fixed_ride_type_per_membertype as (select distinct fixed_ride_type, count(fixed_ride_type) as number_ride_type,member_casual
+  from cleaned_table
+  group by member_casual, fixed_ride_type)
+
+ 
+ 
